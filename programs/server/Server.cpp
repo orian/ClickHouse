@@ -114,6 +114,7 @@
 
 #include <Common/Jemalloc.h>
 
+#include "Server/ACMEClient.h"
 #include "config.h"
 #include <Common/config_version.h>
 
@@ -1903,6 +1904,7 @@ try
             CompressionCodecEncrypted::Configuration::instance().tryLoad(*config, "encryption_codecs");
 #if USE_SSL
             CertificateReloader::instance().tryReloadAll(*config);
+            ACMEClient::ACMEClient::instance().reload(*config);
 #endif
             NamedCollectionFactory::instance().reloadFromConfig(*config);
 
@@ -2344,6 +2346,7 @@ try
 #if USE_SSL
         CertificateReloader::instance().tryLoad(config());
         CertificateReloader::instance().tryLoadClient(config());
+        ACMEClient::ACMEClient::instance().reload(config());
 #endif
 
         /// Must be done after initialization of `servers`, because async_metrics will access `servers` variable from its thread.
