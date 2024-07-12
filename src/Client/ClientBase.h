@@ -9,6 +9,7 @@
 #include <Common/ProgressIndication.h>
 #include <Common/InterruptListener.h>
 #include <Common/ShellCommand.h>
+#include <Common/QueryFuzzer.h>
 #include <Common/Stopwatch.h>
 #include <Common/DNSResolver.h>
 #include <Core/ExternalTable.h>
@@ -16,7 +17,6 @@
 #include <Poco/Util/LayeredConfiguration.h>
 #include <Interpreters/Context.h>
 #include <Client/Suggest.h>
-#include <Client/QueryFuzzer.h>
 #include <boost/program_options.hpp>
 #include <Storages/StorageFile.h>
 #include <Storages/SelectQueryInfo.h>
@@ -373,8 +373,8 @@ protected:
     bool allow_repeated_settings = false;
     bool allow_merge_tree_settings = false;
 
-    bool cancelled = false;
-    bool cancelled_printed = false;
+    std::atomic_bool cancelled = false;
+    std::atomic_bool cancelled_printed = false;
 
     /// Does log_comment has specified by user?
     bool has_log_comment = false;
