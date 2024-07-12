@@ -12,7 +12,7 @@
 #include <Interpreters/Context.h>
 #include <Client/ClientBase.h>
 #include <Client/Suggest.h>
-#include <Client/QueryFuzzer.h>
+#include <Common/QueryFuzzer.h>
 #include <boost/program_options.hpp>
 #include <Storages/StorageFile.h>
 #include <Storages/SelectQueryInfo.h>
