@@ -1,5 +1,6 @@
 #pragma once
 
+#include <base/strong_typedef.h>
 #include <Common/SSHWrapper.h>
 #include <Core/Protocol.h>
 #include <IO/ConnectionTimeouts.h>

@@ -1,20 +1,18 @@
 #pragma once
 
 
-#include <string_view>
-#include "Common/NamePrompter.h"
-#include <cstdio>
-#include <istream>
-#include <unistd.h>
-#include <Parsers/ASTCreateQuery.h>
-#include <Common/ProgressIndication.h>
+#include <Client/Suggest.h>
+#include <Client/QueryFuzzer.h>
+#include <Common/DNSResolver.h>
 #include <Common/InterruptListener.h>
 #include <Common/ProgressIndication.h>
 #include <Common/ShellCommand.h>
 #include <Common/Stopwatch.h>
 #include <Core/ExternalTable.h>
-#include <Poco/Util/Application.h>
-#include <Poco/Util/LayeredConfiguration.h>
+#include <Core/Settings.h>
+#include <Poco/ConsoleChannel.h>
+#include <Poco/SimpleFileChannel.h>
+#include <Poco/SplitterChannel.h>
 #include <Interpreters/Context.h>
 #include <Parsers/ASTCreateQuery.h>
 #include <Poco/Util/Application.h>
@@ -96,8 +94,6 @@ public:
     );
     virtual ~ClientBase();
 
-    virtual ~ClientBase();
-
     bool tryStopQuery() { return query_interrupt_handler.tryStop(); }
     void stopQuery() { return query_interrupt_handler.stop(); }
 
@@ -134,9 +130,7 @@ protected:
     virtual void setupSignalHandler() = 0;
 
     ASTPtr parseQuery(const char *& pos, const char * end, bool allow_multi_statements) const;
-    // void setupSignalHandler();
 
-    static void setupSignalHandler();
     bool executeMultiQuery(const String & all_queries_text);
     MultiQueryProcessingStage analyzeMultiQueryText(
         const char *& this_query_begin, const char *& this_query_end, const char * all_queries_end,

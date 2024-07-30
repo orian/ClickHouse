@@ -43,6 +43,9 @@ public:
 
     int run(const NameToNameMap & envVars, const String & first_query);
 
+    /// NOP
+    void setupSignalHandler() override {}
+
     ~ClientEmbedded() override { cleanup(); }
 
 protected:

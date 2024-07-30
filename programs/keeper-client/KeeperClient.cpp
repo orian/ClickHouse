@@ -4,7 +4,7 @@
 #include <Client/ClientBase.h>
 #include <Common/VersionNumber.h>
 #include <Common/Config/ConfigProcessor.h>
-#include <Client/ClientBaseApplication.h>
+#include <Client/ClientApplicationBase.h>
 #include <Common/EventNotifier.h>
 #include <Common/filesystemHelpers.h>
 #include <Common/ZooKeeper/ZooKeeper.h>

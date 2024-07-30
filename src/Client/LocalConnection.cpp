@@ -1,7 +1,7 @@
 #include "LocalConnection.h"
 #include <memory>
 #include <Client/ClientBase.h>
-#include <Client/ClientBaseApplication.h>
+#include <Client/ClientApplicationBase.h>
 #include <Core/Protocol.h>
 #include <Interpreters/DatabaseCatalog.h>
 #include <Interpreters/executeQuery.h>

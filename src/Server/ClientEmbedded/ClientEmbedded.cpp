@@ -112,7 +112,6 @@ try
     {
         echo_queries = getEnvOption<bool>(envVars, "echo", false) || getEnvOption<bool>(envVars, "verbose", false);
         ignore_error = getEnvOption<bool>(envVars, "ignore_error", false);
-        is_multiquery = true;
     }
     load_suggestions = (is_interactive || delayed_interactive) && !getEnvOption<bool>(envVars, "disable_suggestion", false);
     if (load_suggestions)
