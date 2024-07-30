@@ -1,5 +1,6 @@
 #pragma once
 
+
 #include <string_view>
 #include "Common/NamePrompter.h"
 #include <cstdio>
@@ -8,19 +9,26 @@
 #include <Parsers/ASTCreateQuery.h>
 #include <Common/ProgressIndication.h>
 #include <Common/InterruptListener.h>
+#include <Common/ProgressIndication.h>
 #include <Common/ShellCommand.h>
-#include <Common/QueryFuzzer.h>
 #include <Common/Stopwatch.h>
-#include <Common/DNSResolver.h>
 #include <Core/ExternalTable.h>
 #include <Poco/Util/Application.h>
 #include <Poco/Util/LayeredConfiguration.h>
 #include <Interpreters/Context.h>
-#include <Client/Suggest.h>
-#include <boost/program_options.hpp>
-#include <Storages/StorageFile.h>
-#include <Storages/SelectQueryInfo.h>
+#include <Parsers/ASTCreateQuery.h>
+#include <Poco/Util/Application.h>
+
 #include <Storages/MergeTree/MergeTreeSettings.h>
+#include <Storages/SelectQueryInfo.h>
+#include <Storages/StorageFile.h>
+
+#include <boost/program_options.hpp>
+
+#include <atomic>
+#include <optional>
+#include <string_view>
+#include <string>
 
 namespace po = boost::program_options;
 
@@ -64,10 +72,16 @@ std::istream& operator>> (std::istream & in, ProgressOption & progress);
 class InternalTextLogs;
 class WriteBufferFromFileDescriptor;
 
-// Core client functionality. Can be used embedded into server and in standalone application.
+/**
+ * The base class which encapsulates the core functionality of a client.
+ * Can be used in a standalone application (clickhouse-client or clickhouse-local),
+ * or be embedded into server.
+ * Always keep in mind that there can be several instances of this class within
+ * a process. Thus, it cannot keep its state in global shared variables or even use them.
+ * The best example - std::cin, std::cout and std::cerr.
+ */
 class ClientBase
 {
-
 public:
     using Arguments = std::vector<String>;
 
@@ -80,6 +94,7 @@ public:
         std::ostream & output_stream_ = std::cout,
         std::ostream & error_stream_ = std::cerr
     );
+    virtual ~ClientBase();
 
     virtual ~ClientBase();
 
@@ -116,6 +131,7 @@ protected:
         ASTPtr parsed_query, std::optional<bool> echo_query_ = {}, bool report_error = false);
 
     static void adjustQueryEnd(const char *& this_query_end, const char * all_queries_end, uint32_t max_parser_depth, uint32_t max_parser_backtracks);
+    virtual void setupSignalHandler() = 0;
 
     ASTPtr parseQuery(const char *& pos, const char * end, bool allow_multi_statements) const;
     // void setupSignalHandler();
@@ -203,7 +219,8 @@ protected:
         void start(Int32 signals_before_stop = 1) { exit_after_signals.store(signals_before_stop); }
 
         /// Set value not greater then 0 to mark the query as stopped.
-        void stop() { return exit_after_signals.store(0); }
+
+        void stop() { exit_after_signals.store(0); }
 
         /// Return true if the query was stopped.
         /// Query was stopped if it received at least "signals_before_stop" interrupt signals.
@@ -211,7 +228,8 @@ protected:
         bool cancelled() { return exit_after_signals.load() <= 0; }
 
         /// Return how much interrupt signals remain before stop.
-        Int32 cancelledStatus() { return exit_after_signals.load(); }
+        Int32 cancelled_status() { return exit_after_signals.load(); }
+
     private:
         std::atomic<Int32> exit_after_signals = 0;
     };
@@ -226,6 +244,9 @@ protected:
     /// Adjust some settings after command line options and config had been processed.
     void adjustSettings();
 
+    /// Initializes the client context.
+    void initClientContext();
+
     void setDefaultFormatsAndCompressionFromConfiguration();
 
     void initTTYBuffer(ProgressOption progress);
@@ -237,6 +258,9 @@ protected:
     SharedContextHolder shared_context; // maybe not initialized
     ContextMutablePtr global_context;
 
+    /// Client context is a context used only by the client to parse queries, process query parameters and to connect to clickhouse-server.
+    ContextMutablePtr client_context;
+
     String default_database;
     String query_id;
     Int32 suggestion_limit;
@@ -245,7 +269,6 @@ protected:
     String static_query;
 
     bool is_interactive = false; /// Use either interactive line editing interface or batch mode.
-    bool is_multiquery = false;
     bool delayed_interactive = false;
 
     bool echo_queries = false; /// Print queries before execution in batch mode.
@@ -258,7 +281,6 @@ protected:
     std::vector<String> queries; /// Queries passed via '--query'
     std::vector<String> queries_files; /// If not empty, queries will be read from these files
     std::vector<String> interleave_queries_files; /// If not empty, run queries from these files before processing every file from 'queries_files'.
-    std::vector<String> cmd_options;
 
     bool stdin_is_a_tty = false; /// stdin is a terminal.
     bool stdout_is_a_tty = false; /// stdout is a terminal.

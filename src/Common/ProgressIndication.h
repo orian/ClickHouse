@@ -1,14 +1,16 @@
 #pragma once
 
-#include <unordered_map>
-#include <mutex>
-#include <unistd.h>
 #include <IO/Progress.h>
 #include <Interpreters/Context.h>
 #include <base/types.h>
 #include <Common/Stopwatch.h>
 #include <Common/EventRateMeter.h>
 
+#include <iostream>
+#include <mutex>
+#include <unistd.h>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace DB
 {
@@ -71,11 +73,6 @@ public:
     /// How much seconds passed since query execution start.
     double elapsedSeconds() const { return getElapsedNanoseconds() / 1e9; }
 
-    void updateThreadEventData(HostToTimesMap & new_hosts_data);
-
-private:
-    double getCPUUsage();
-
     struct MemoryUsage
     {
         UInt64 total = 0;
@@ -84,6 +81,11 @@ private:
     };
 
     MemoryUsage getMemoryUsage() const;
+
+    void updateThreadEventData(HostToTimesMap & new_hosts_data);
+
+private:
+    double getCPUUsage();
 
     UInt64 getElapsedNanoseconds() const;
 
