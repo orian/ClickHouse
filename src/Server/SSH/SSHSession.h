@@ -16,39 +16,42 @@ namespace ssh
 class SSHSession
 {
 public:
-    using SessionPtr = ssh_session_struct *;
-
     SSHSession();
     ~SSHSession();
-
     SSHSession(const SSHSession &) = delete;
     SSHSession & operator=(const SSHSession &) = delete;
+    SSHSession(SSHSession &&) noexcept = default;
+    SSHSession & operator=(SSHSession &&) noexcept = default;
 
-    SSHSession(SSHSession &&) noexcept;
-    SSHSession & operator=(SSHSession &&) noexcept;
+    using SessionPtr = ssh_session_struct *;
+    /// Get raw pointer from libssh to be able to pass it to other objects
+    SessionPtr getInternalPtr() const;
 
-    // Get c pointer from libssh to be able to pass it to other objects
-    SessionPtr getCSessionPtr() const;
-
-    // Disable reading default libssh configuration
+    /// Disable reading default libssh configuration
     void disableDefaultConfig();
+    /// Disable session from closing socket. Can be used when a socket is passed.
+    void disableSocketOwning();
+
+    /// Connect / disconnect
     void connect();
+    void disconnect();
+
+    /// Configure session
     void setPeerHost(const String & host);
     // Pass ready socket to session
     void setFd(int fd);
     void setTimeout(int timeout, int timeout_usec);
-    // Disable session from closing socket. Can be used when a socket is passed
-    void disableSocketOwning();
+
     void handleKeyExchange();
-    void disconnect();
+
+    /// Error handling
     String getError();
+
     // Check that session was closed
     bool hasFinished();
 
 private:
-    static void deleter(SessionPtr session);
-
-    std::unique_ptr<ssh_session_struct, decltype(&deleter)> session;
+    SessionPtr session;
 };
 
 }

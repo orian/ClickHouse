@@ -65,7 +65,7 @@ void SSHBind::listen()
 
 void SSHBind::acceptFd(SSHSession & session, int fd)
 {
-    if (ssh_bind_accept_fd(bind.get(), session.getCSessionPtr(), fd) != SSH_OK)
+    if (ssh_bind_accept_fd(bind.get(), session.getInternalPtr(), fd) != SSH_OK)
         throw DB::Exception(DB::ErrorCodes::SSH_EXCEPTION, "Failed accepting fd in sshbind due to {}", getError());
 }
 

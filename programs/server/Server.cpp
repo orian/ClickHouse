@@ -2615,33 +2615,36 @@ void Server::createServers(
             });
         }
 
-        port_name = "tcp_port_ssh";
-        createServer(
-            config,
-            listen_host,
-            port_name,
-            listen_try,
-            start_servers,
-            servers,
-            [&](UInt16 port) -> ProtocolServerAdapter
-            {
+        if (server_type.shouldStart(ServerType::Type::TCP_SSH))
+        {
+            port_name = "tcp_ssh_port";
+            createServer(
+                config,
+                listen_host,
+                port_name,
+                listen_try,
+                start_servers,
+                servers,
+                [&](UInt16 port) -> ProtocolServerAdapter
+                {
 #if USE_SSH
-                Poco::Net::ServerSocket socket;
-                auto address = socketBindListen(config, socket, listen_host, port, /* secure = */ false);
-                return ProtocolServerAdapter(
-                    listen_host,
-                    port_name,
-                    "SSH pty: " + address.toString(),
-                    std::make_unique<TCPServer>(
-                        new SSHPtyHandlerFactory(*this, config),
-                        server_pool,
-                        socket,
-                        new Poco::Net::TCPServerParams));
+                    Poco::Net::ServerSocket socket;
+                    auto address = socketBindListen(config, socket, listen_host, port, /* secure = */ false);
+                    return ProtocolServerAdapter(
+                        listen_host,
+                        port_name,
+                        "SSH pty: " + address.toString(),
+                        std::make_unique<TCPServer>(
+                            new SSHPtyHandlerFactory(*this, config),
+                            server_pool,
+                            socket,
+                            new Poco::Net::TCPServerParams));
 #else
-            UNUSED(port);
-            throw Exception(ErrorCodes::SUPPORT_IS_DISABLED, "SSH protocol is disabled for ClickHouse, as it has been built without OpenSSL");
+                UNUSED(port);
+                throw Exception(ErrorCodes::SUPPORT_IS_DISABLED, "SSH protocol is disabled for ClickHouse, as it has been built without libssh");
 #endif
-            });
+                });
+        }
 
         if (server_type.shouldStart(ServerType::Type::MYSQL))
         {

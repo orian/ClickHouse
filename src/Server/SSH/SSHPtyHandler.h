@@ -18,7 +18,7 @@ public:
     explicit SSHPtyHandler
     (
         IServer & server_,
-        ::ssh::SSHSession && session_,
+        ::ssh::SSHSession session_,
         const Poco::Net::StreamSocket & socket,
         unsigned int max_auth_attempts_,
         unsigned int auth_timeout_seconds_,

@@ -22,9 +22,7 @@ namespace ssh
 SSHEvent::SSHEvent() : event(ssh_event_new(), &deleter)
 {
     if (!event)
-    {
         throw DB::Exception(DB::ErrorCodes::SSH_EXCEPTION, "Failed to create ssh_event");
-    }
 }
 
 SSHEvent::~SSHEvent() = default;
@@ -44,22 +42,22 @@ SSHEvent & SSHEvent::operator=(SSHEvent && other) noexcept
 
 void SSHEvent::addSession(SSHSession & session)
 {
-    if (ssh_event_add_session(event.get(), session.getCSessionPtr()) == SSH_ERROR)
+    if (ssh_event_add_session(event.get(), session.getInternalPtr()) != SSH_OK)
         throw DB::Exception(DB::ErrorCodes::SSH_EXCEPTION, "Error adding session to ssh event");
 }
 
 void SSHEvent::removeSession(SSHSession & session)
 {
-    ssh_event_remove_session(event.get(), session.getCSessionPtr());
+    if (ssh_event_remove_session(event.get(), session.getInternalPtr()) != SSH_OK)
+        throw DB::Exception(DB::ErrorCodes::SSH_EXCEPTION, "Error removing session from ssh event");
 }
 
 int SSHEvent::poll(int timeout)
 {
     int rc = ssh_event_dopoll(event.get(), timeout);
-    if (rc == SSH_ERROR)
-    {
+    if (rc != SSH_OK)
         throw DB::Exception(DB::ErrorCodes::SSH_EXCEPTION, "Error on polling on ssh event");
-    }
+
     return rc;
 }
 
@@ -70,7 +68,7 @@ int SSHEvent::poll()
 
 void SSHEvent::addFd(int fd, int events, EventCallback cb, void * userdata)
 {
-    if (ssh_event_add_fd(event.get(), fd, events, cb, userdata) == SSH_ERROR)
+    if (ssh_event_add_fd(event.get(), fd, events, cb, userdata) != SSH_OK)
         throw DB::Exception(DB::ErrorCodes::SSH_EXCEPTION, "Error on adding custom file descriptor to ssh event");
 }
 

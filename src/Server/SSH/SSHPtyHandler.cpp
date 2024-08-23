@@ -310,9 +310,9 @@ public:
         server_cb.userdata = this;
         server_cb.auth_password_function = authPasswordAdapter<ssh_session, const char*, const char*>;
         server_cb.auth_pubkey_function = authPublickeyAdapter<ssh_session, const char *, ssh_key, char>;
-        ssh_set_auth_methods(session.getCSessionPtr(), SSH_AUTH_METHOD_PASSWORD | SSH_AUTH_METHOD_PUBLICKEY);
+        ssh_set_auth_methods(session.getInternalPtr(), SSH_AUTH_METHOD_PASSWORD | SSH_AUTH_METHOD_PUBLICKEY);
         server_cb.channel_open_request_session_function = channelOpenAdapter<ssh_session>;
-        ssh_callbacks_init(&server_cb) ssh_set_server_callbacks(session.getCSessionPtr(), &server_cb);
+        ssh_callbacks_init(&server_cb) ssh_set_server_callbacks(session.getInternalPtr(), &server_cb);
     }
 
     size_t auth_attempts = 0;
@@ -422,7 +422,7 @@ private:
 
 SSHPtyHandler::SSHPtyHandler(
     IServer & server_,
-    ::ssh::SSHSession && session_,
+    ::ssh::SSHSession session_,
     const Poco::Net::StreamSocket & socket,
     unsigned int max_auth_attempts_,
     unsigned int auth_timeout_seconds_,
