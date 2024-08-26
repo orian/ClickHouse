@@ -54,11 +54,17 @@ void SSHEvent::removeSession(SSHSession & session)
 
 int SSHEvent::poll(int timeout)
 {
-    int rc = ssh_event_dopoll(event.get(), timeout);
-    if (rc != SSH_OK)
-        throw DB::Exception(DB::ErrorCodes::SSH_EXCEPTION, "Error on polling on ssh event");
+    while (true)
+    {
+        int rc = ssh_event_dopoll(event.get(), timeout);
 
-    return rc;
+        if (rc == SSH_AGAIN)
+            continue;
+        if (rc != SSH_OK)
+            throw DB::Exception(DB::ErrorCodes::SSH_EXCEPTION, "Error on polling on ssh event: {}", rc);
+
+        return rc;
+    }
 }
 
 int SSHEvent::poll()

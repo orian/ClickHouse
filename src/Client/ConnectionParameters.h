@@ -33,12 +33,6 @@ struct ConnectionParameters
     using Database = StrongTypedef<String, struct DatabaseTag>;
     using Host = StrongTypedef<String, struct HostTag>;
 
-    // // We don't take database from config, as it can be changed after query execution
-    // ConnectionParameters(const Poco::Util::AbstractConfiguration & config, const std::string & database, std::string host);
-    // ConnectionParameters(
-    //     const Poco::Util::AbstractConfiguration & config, const std::string & database, std::string host, std::optional<UInt16> port
-    // );
-
     ConnectionParameters() = default;
     ConnectionParameters(const Poco::Util::AbstractConfiguration & config_, const Host & host_, const Database & database_);
     ConnectionParameters(const Poco::Util::AbstractConfiguration & config_, const Host & host_, const Database & database_, std::optional<UInt16> port_);

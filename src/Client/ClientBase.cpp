@@ -68,7 +68,6 @@
 
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/replace.hpp>
-
 #include <iostream>
 #include <filesystem>
 #include <limits>
@@ -86,6 +85,10 @@
 #if USE_GWP_ASAN
 #    include <Common/GWPAsan.h>
 #endif
+
+
+namespace fs = std::filesystem;
+using namespace std::literals;
 
 namespace DB
 {
@@ -112,6 +115,22 @@ namespace ErrorCodes
     extern const int USER_EXPIRED;
 }
 
+}
+
+namespace ProfileEvents
+{
+    extern const Event UserTimeMicroseconds;
+    extern const Event SystemTimeMicroseconds;
+}
+
+namespace
+{
+constexpr UInt64 THREAD_GROUP_ID = 0;
+}
+
+namespace DB
+{
+
 ProgressOption toProgressOption(std::string progress)
 {
     boost::to_upper(progress);
@@ -135,22 +154,6 @@ std::istream& operator>> (std::istream & in, ProgressOption & progress)
     progress = toProgressOption(token);
     return in;
 }
-
-}
-
-namespace ProfileEvents
-{
-    extern const Event UserTimeMicroseconds;
-    extern const Event SystemTimeMicroseconds;
-}
-
-namespace
-{
-constexpr UInt64 THREAD_GROUP_ID = 0;
-}
-
-namespace DB
-{
 
 static void incrementProfileEventsBlock(Block & dst, const Block & src)
 {
@@ -252,13 +255,13 @@ static void incrementProfileEventsBlock(Block & dst, const Block & src)
     dst.setColumns(std::move(mutable_columns));
 }
 
-
 /// To cancel the query on local format error.
 class LocalFormatError : public DB::Exception
 {
 public:
     using Exception::Exception;
 };
+
 
 ClientBase::~ClientBase() = default;
 
@@ -410,7 +413,6 @@ void ClientBase::onData(Block & block, ASTPtr parsed_query)
         return;
 
     processed_rows += block.rows();
-
     /// Even if all blocks are empty, we still need to initialize the output stream to write empty resultset.
     initOutputFormat(block, parsed_query);
 
@@ -693,7 +695,6 @@ void ClientBase::adjustSettings()
     global_context->setSettings(settings);
 }
 
-
 void ClientBase::initClientContext()
 {
     client_context->setClientName(std::string(DEFAULT_CLIENT_NAME));
@@ -703,13 +704,11 @@ void ClientBase::initClientContext()
     client_context->setQueryParameters(query_parameters);
 }
 
-
 bool ClientBase::isRegularFile(int fd)
 {
     struct stat file_stat;
     return fstat(fd, &file_stat) == 0 && S_ISREG(file_stat.st_mode);
 }
-
 
 void ClientBase::setDefaultFormatsAndCompressionFromConfiguration()
 {
@@ -789,7 +788,6 @@ void ClientBase::setDefaultFormatsAndCompressionFromConfiguration()
             global_context->getSettingsRef().max_insert_block_size);
     }
 }
-
 
 void ClientBase::initTTYBuffer(ProgressOption progress)
 {
@@ -950,7 +948,6 @@ void ClientBase::processTextAsSingleQuery(const String & full_query)
     if (have_error)
         processError(full_query);
 }
-
 
 void ClientBase::processOrdinaryQuery(const String & query_to_execute, ASTPtr parsed_query)
 {
@@ -1470,6 +1467,7 @@ void ClientBase::setInsertionTable(const ASTInsertQuery & insert_query)
         }
     }
 }
+
 
 namespace
 {

@@ -18,10 +18,11 @@ class SSHSession
 public:
     SSHSession();
     ~SSHSession();
+    SSHSession(SSHSession &&) noexcept;
+    SSHSession & operator=(SSHSession &&) noexcept;
+
     SSHSession(const SSHSession &) = delete;
     SSHSession & operator=(const SSHSession &) = delete;
-    SSHSession(SSHSession &&) noexcept = default;
-    SSHSession & operator=(SSHSession &&) noexcept = default;
 
     using SessionPtr = ssh_session_struct *;
     /// Get raw pointer from libssh to be able to pass it to other objects
@@ -51,7 +52,7 @@ public:
     bool hasFinished();
 
 private:
-    SessionPtr session;
+    SessionPtr session = nullptr;
 };
 
 }

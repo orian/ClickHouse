@@ -1,4 +1,4 @@
-#include "ClientEmbedded.h"
+#include <Server/ClientEmbedded/ClientEmbedded.h>
 
 #include <base/getFQDNOrHostName.h>
 #include <Interpreters/Session.h>
@@ -96,6 +96,9 @@ int ClientEmbedded::run(const NameToNameMap & envVars, const String & first_quer
 {
 try
 {
+    client_context = session->sessionContext();
+    initClientContext();
+
     setThreadName("LocalServerPty");
 
     query_processing_stage = QueryProcessingStage::Enum::Complete;
@@ -125,7 +128,7 @@ try
 
     default_database = getEnvOption<String>(envVars, "database", "");
 
-    format = getEnvOption<String>(envVars, "output-format", getEnvOption<String>(envVars, "format", is_interactive ? "PrettyCompact" : "TSV"));
+    default_output_format = getEnvOption<String>(envVars, "output-format", getEnvOption<String>(envVars, "format", is_interactive ? "PrettyCompact" : "TSV"));
     // TODO: Fix
     // insert_format = "Values";
     insert_format_max_block_size = getEnvOption<size_t>(envVars, "insert_format_max_block_size",

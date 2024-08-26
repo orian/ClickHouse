@@ -57,6 +57,14 @@ protected:
 
     String getName() const override { return "embedded"; }
 
+    void printHelpMessage(const OptionsDescription &, bool) override {}
+    void addOptions(OptionsDescription &) override {}
+    void processOptions(const OptionsDescription &,
+                        const CommandLineOptions &,
+                        const std::vector<Arguments> &,
+                        const std::vector<Arguments> &) override {}
+    void processConfig() override {}
+
 private:
     void cleanup();
 

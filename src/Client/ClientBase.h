@@ -30,6 +30,7 @@
 
 namespace po = boost::program_options;
 
+
 namespace DB
 {
 
@@ -95,9 +96,8 @@ public:
     virtual ~ClientBase();
 
     bool tryStopQuery() { return query_interrupt_handler.tryStop(); }
-    void stopQuery() { return query_interrupt_handler.stop(); }
+    void stopQuery() { query_interrupt_handler.stop(); }
 
-    // std::vector<String> getAllRegisteredNames() const override { return cmd_options; }
     ASTPtr parseQuery(const char *& pos, const char * end, const Settings & settings, bool allow_multi_statements);
 
 protected:
@@ -151,14 +151,13 @@ protected:
     };
 
     virtual void updateLoggerLevel(const String &) {}
-
-    virtual void printHelpMessage([[maybe_unused]] const OptionsDescription & options_description, [[maybe_unused]] bool verbose) {}
-    virtual void addOptions([[maybe_unused]] OptionsDescription & options_description) {}
-    virtual void processOptions([[maybe_unused]] const OptionsDescription & options_description,
-                                [[maybe_unused]] const CommandLineOptions & options,
-                                [[maybe_unused]] const std::vector<Arguments> & external_tables_arguments,
-                                [[maybe_unused]] const std::vector<Arguments> & hosts_and_ports_arguments) {}
-    virtual void processConfig() {}
+    virtual void printHelpMessage(const OptionsDescription & options_description, bool verbose) = 0;
+    virtual void addOptions(OptionsDescription & options_description) = 0;
+    virtual void processOptions(const OptionsDescription & options_description,
+                                const CommandLineOptions & options,
+                                const std::vector<Arguments> & external_tables_arguments,
+                                const std::vector<Arguments> & hosts_and_ports_arguments) = 0;
+    virtual void processConfig() = 0;
 
     /// Returns true if query processing was successful.
     bool processQueryText(const String & text);
@@ -245,8 +244,6 @@ protected:
 
     void initTTYBuffer(ProgressOption progress);
 
-    void parseAndCheckOptions(OptionsDescription & options_description, po::variables_map & options, Arguments & arguments);
-
     /// Should be one of the first, to be destroyed the last,
     /// since other members can use them.
     SharedContextHolder shared_context; // maybe not initialized
@@ -281,7 +278,6 @@ protected:
     bool stderr_is_a_tty = false; /// stderr is a terminal.
     uint64_t terminal_width = 0;
 
-    String format; /// Query results output format.
     String pager;
 
     String default_output_format; /// Query results output format.
@@ -392,11 +388,6 @@ protected:
     std::atomic_bool cancelled = false;
     std::atomic_bool cancelled_printed = false;
 
-    /// Does log_comment has specified by user?
-    bool has_log_comment = false;
-
-    bool logging_initialized = false;
-
     /// Unpacked descriptors and streams for the ease of use.
     int in_fd = STDIN_FILENO;
     int out_fd = STDOUT_FILENO;
@@ -404,6 +395,7 @@ protected:
     std::istream & input_stream;
     std::ostream & output_stream;
     std::ostream & error_stream;
+
 };
 
 }

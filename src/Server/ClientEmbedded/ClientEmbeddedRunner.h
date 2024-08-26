@@ -48,6 +48,5 @@ private:
     ThreadFromGlobalPool client_thread;
     std::unique_ptr<Session> db_session;
     Poco::Logger * log;
-    // LocalServerPty client;
 };
 }

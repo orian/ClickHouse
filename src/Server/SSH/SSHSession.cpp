@@ -27,7 +27,20 @@ SSHSession::SSHSession() : session(ssh_new())
 
 SSHSession::~SSHSession()
 {
-    ssh_free(session);
+    if (session)
+        ssh_free(session);
+}
+
+SSHSession::SSHSession(SSHSession && rhs) noexcept
+{
+    *this = std::move(rhs);
+}
+
+SSHSession & SSHSession::operator=(SSHSession && rhs) noexcept
+{
+    this->session = rhs.session;
+    rhs.session = nullptr;
+    return *this;
 }
 
 SSHSession::SessionPtr SSHSession::getInternalPtr() const
