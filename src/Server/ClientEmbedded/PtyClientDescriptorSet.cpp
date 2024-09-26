@@ -1,5 +1,6 @@
 #include <Server/ClientEmbedded/PtyClientDescriptorSet.h>
 #include <Common/Exception.h>
+
 #include "openpty.h"
 
 namespace DB
@@ -15,7 +16,7 @@ void PtyClientDescriptorSet::FileDescriptorWrapper::close()
     if (fd != -1)
     {
         if (::close(fd) != 0 && errno != EINTR)
-            ErrnoException(ErrorCodes::SYSTEM_ERROR, "Unexpected error while closing file descriptor");
+            throw ErrnoException(ErrorCodes::SYSTEM_ERROR, "Unexpected error while closing file descriptor");
     }
     fd = -1;
 }
@@ -32,7 +33,7 @@ PtyClientDescriptorSet::PtyClientDescriptorSet(const String & term_name_, int wi
     int pty_master_raw = -1, pty_slave_raw = -1;
     if (openpty(&pty_master_raw, &pty_slave_raw, nullptr, nullptr, &winsize) != 0)
     {
-        ErrnoException(ErrorCodes::SYSTEM_ERROR, "Cannot open pty");
+        throw ErrnoException(ErrorCodes::SYSTEM_ERROR, "Cannot open pty");
     }
     pty_master.capture(pty_master_raw);
     pty_slave.capture(pty_slave_raw);
@@ -43,12 +44,12 @@ PtyClientDescriptorSet::PtyClientDescriptorSet(const String & term_name_, int wi
     struct termios tios;
     if (tcgetattr(pty_slave.get(), &tios) == -1)
     {
-        ErrnoException(ErrorCodes::SYSTEM_ERROR, "Cannot get termios from tty via tcgetattr");
+        throw ErrnoException(ErrorCodes::SYSTEM_ERROR, "Cannot get termios from tty via tcgetattr");
     }
     tios.c_lflag &= ~ISIG;
     if (tcsetattr(pty_slave.get(), TCSANOW, &tios) == -1)
     {
-        ErrnoException(ErrorCodes::SYSTEM_ERROR, "Cannot set termios to tty via tcsetattr");
+        throErrnoException(ErrorCodes::SYSTEM_ERROR, "Cannot set termios to tty via tcsetattr");
     }
     input_stream.open(fd_source);
     output_stream.open(fd_sink);
