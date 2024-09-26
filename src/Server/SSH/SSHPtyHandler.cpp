@@ -13,7 +13,6 @@
 #include <Server/ClientEmbedded/ClientEmbeddedRunner.h>
 #include <Server/ClientEmbedded/IClientDescriptorSet.h>
 #include <Server/ClientEmbedded/PtyClientDescriptorSet.h>
-#include <Server/ClientEmbedded/openpty.h>
 #include <Server/SSH/SSHChannel.h>
 #include <Server/SSH/SSHEvent.h>
 

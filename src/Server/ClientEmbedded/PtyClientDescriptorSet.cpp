@@ -1,7 +1,7 @@
 #include <Server/ClientEmbedded/PtyClientDescriptorSet.h>
 #include <Common/Exception.h>
 
-#include "openpty.h"
+#include "pty.h"
 
 namespace DB
 {
@@ -49,7 +49,7 @@ PtyClientDescriptorSet::PtyClientDescriptorSet(const String & term_name_, int wi
     tios.c_lflag &= ~ISIG;
     if (tcsetattr(pty_slave.get(), TCSANOW, &tios) == -1)
     {
-        throErrnoException(ErrorCodes::SYSTEM_ERROR, "Cannot set termios to tty via tcsetattr");
+        throw ErrnoException(ErrorCodes::SYSTEM_ERROR, "Cannot set termios to tty via tcsetattr");
     }
     input_stream.open(fd_source);
     output_stream.open(fd_sink);
@@ -67,7 +67,7 @@ void PtyClientDescriptorSet::changeWindowSize(int width, int height, int width_p
 
     if (ioctl(pty_master.get(), TIOCSWINSZ, &winsize) == -1)
     {
-        ErrnoException(ErrorCodes::SYSTEM_ERROR, "Cannot update terminal window size via ioctl TIOCSWINSZ");
+        throw ErrnoException(ErrorCodes::SYSTEM_ERROR, "Cannot update terminal window size via ioctl TIOCSWINSZ");
     }
 }
 
