@@ -16,7 +16,7 @@ namespace DB
 {
 struct ConnectionParameters
 {
-    std::string host;
+    String host;
     UInt16 port{};
     std::string default_database;
     std::string user;
