@@ -15,6 +15,11 @@ namespace ErrorCodes
     extern const int LOGICAL_ERROR;
 }
 
+
+namespace Setting
+{
+    extern const SettingsUInt64 max_insert_block_size;
+}
 namespace
 {
 
@@ -132,7 +137,7 @@ try
     // TODO: Fix
     // insert_format = "Values";
     insert_format_max_block_size = getEnvOption<size_t>(envVars, "insert_format_max_block_size",
-        global_context->getSettingsRef().max_insert_block_size);
+        global_context->getSettingsRef()[Setting::max_insert_block_size]);
 
 
     server_display_name = getEnvOption<String>(envVars, "display_name", getFQDNOrHostName());
@@ -140,7 +145,8 @@ try
     std::map<String, String> prompt_substitutions{{"display_name", server_display_name}};
     for (const auto & [key, value] : prompt_substitutions)
         boost::replace_all(prompt_by_server_display_name, "{" + key + "}", value);
-    initTTYBuffer(toProgressOption(getEnvOption<String>(envVars, "progress", "default")));
+    initTTYBuffer(toProgressOption(getEnvOption<String>(envVars, "progress", "default")),
+        toProgressOption(getEnvOption<String>(envVars, "progress-table", "default")));
 
     if (is_interactive)
     {

@@ -2731,7 +2731,6 @@ void ClientBase::runInteractive()
     lr = std::make_unique<ReplxxLineReader>(
         *suggest,
         actual_history_file_path,
-        history_file,
         history_max_entries,
         getClientConfiguration().has("multiline"),
         getClientConfiguration().getBool("ignore_shell_suspend", true),

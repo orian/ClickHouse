@@ -380,11 +380,13 @@ private:
                 // This is the case when user wants to check if he is able to use this type of authentication.
                 // Also here we may check if the key is associated with the user, but current session
                 // authentication mechanism doesn't support it.
-                if (db_session_created->getAuthenticationType(user_name) != AuthenticationType::SSH_KEY)
-                {
-                    return SSH_AUTH_DENIED;
-                }
-                return SSH_AUTH_SUCCESS;
+
+                const auto user_authentication_types = db_session_created->getAuthenticationTypes(user_name);
+
+                for (auto user_authentication_type : user_authentication_types)
+                    if (user_authentication_type == AuthenticationType::SSH_KEY)
+
+                return SSH_AUTH_DENIED;
             }
 
             if (signature_state != SSH_PUBLICKEY_STATE_VALID)
