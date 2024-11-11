@@ -100,7 +100,8 @@ void DB::TLSHandler::run()
 {
 #if USE_SSL
     auto ctx = SSLManager::instance().defaultServerContext();
-    if (!params.privateKeyFile.empty() && !params.certificateFile.empty())
+    // if (!params.privateKeyFile.empty() && !params.certificateFile.empty())
+    if (config.has("acme"))
     {
         ctx = SSLManager::instance().getCustomServerContext(prefix);
         if (!ctx)

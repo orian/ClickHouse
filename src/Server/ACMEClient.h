@@ -1,6 +1,7 @@
 #pragma once
 
 #include <unordered_set>
+#include <Poco/Crypto/EVPPKey.h>
 #include "config.h"
 
 #include <Common/ZooKeeper/ZooKeeperLock.h>
@@ -103,7 +104,7 @@ public:
 
     bool isReady() const { return false; }
 
-    void requestCertificate(const Poco::Util::AbstractConfiguration & config);
+    std::optional<std::tuple<Poco::Crypto::EVPPKey, Poco::Crypto::X509Certificate>> requestCertificate(const Poco::Util::AbstractConfiguration & config);
 private:
     ACMEClient() = default;
 
@@ -126,6 +127,7 @@ private:
     std::shared_ptr<Poco::Crypto::RSAKey> private_acme_key;
     std::mutex private_acme_key_mutex;
 
+    std::string acme_hostname;
     DirectoryPtr directory;
 
     BackgroundSchedulePoolTaskHolder authentication_task;
@@ -134,16 +136,17 @@ private:
 
     zkutil::ZooKeeperPtr zookeeper;
     std::shared_ptr<zkutil::ZooKeeperLock> lock;
+    zkutil::EphemeralNodeHolderPtr lock2;
 
     std::vector<std::string> domains;
     UInt64 refresh_certificates_interval;
-    std::unordered_set<std::string> order_urls;
+    std::optional<std::string> active_order;
 
     std::string requestNonce();
     DirectoryPtr getDirectory();
     void authenticate();
     std::string order();
-    void finalizeOrder(const std::string &);
+    void finalizeOrder(const std::string &, const std::string &);
     void processAuthorization(const std::string & auth_url);
     void tryGet(const std::string & finalize_url, Poco::Crypto::RSAKey & key);
     std::string doJWSRequest(const std::string &, const std::string &, std::shared_ptr<Poco::Net::HTTPResponse>);

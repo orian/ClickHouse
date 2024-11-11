@@ -40,6 +40,7 @@ public:
         Poco::Crypto::EVPPKey key;
 
         Data(std::string cert_path, std::string key_path, std::string pass_phrase);
+        Data(Poco::Crypto::EVPPKey, Poco::Crypto::X509Certificate);
     };
 
     struct File

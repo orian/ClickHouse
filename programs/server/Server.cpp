@@ -2723,11 +2723,11 @@ void Server::createServers(
             createServer(config, listen_host, port_name, listen_try, start_servers, servers, [&](UInt16 port) -> ProtocolServerAdapter
             {
 #if USE_SSL
-                while (!ACMEClient::ACMEClient::instance().isReady())
-                {
-                    LOG_WARNING(&logger(), "Failed to initialize ACME client. Retry in 10 seconds.");
-                    std::this_thread::sleep_for(std::chrono::seconds(10));
-                }
+                // while (!ACMEClient::ACMEClient::instance().isReady())
+                // {
+                //     LOG_WARNING(&logger(), "Failed to initialize ACME client. Retry in 10 seconds.");
+                //     std::this_thread::sleep_for(std::chrono::seconds(10));
+                // }
 
                 Poco::Net::SecureServerSocket socket;
                 auto address = socketBindListen(config, socket, listen_host, port, /* secure = */ true);
