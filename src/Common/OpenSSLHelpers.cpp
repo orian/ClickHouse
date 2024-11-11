@@ -40,9 +40,10 @@ void encodeSHA256(const void * text, size_t size, unsigned char * out)
     SHA256_Final(out, &ctx);
 }
 
-std::string calculateHMACwithSHA256(std::string to_sign, Poco::Crypto::RSAKey & key)
+std::string calculateHMACwithSHA256(std::string to_sign, const Poco::Crypto::RSAKey & key)
 {
     EVP_PKEY * pkey = EVP_PKEY_new();
+
     if (EVP_PKEY_assign_RSA(pkey, key.impl()->getRSA()) != 1)
     {
         EVP_PKEY_free(pkey);
@@ -71,7 +72,7 @@ std::string calculateHMACwithSHA256(std::string to_sign, Poco::Crypto::RSAKey & 
     }
 
     EVP_MD_CTX_destroy(context);
-    EVP_PKEY_free(pkey);
+    // EVP_PKEY_free(pkey);  /// FIXME this segfaults due to cleaning RSAKey memory.
 
     std::string signature = { signature_bytes.begin(), signature_bytes.end() };
     return base64Encode(signature, /*url_encoding*/ true, /*no_padding*/ true);

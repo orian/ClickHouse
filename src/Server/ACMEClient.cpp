@@ -52,9 +52,9 @@ namespace DB
 
 namespace ErrorCodes
 {
-extern const int BAD_ARGUMENTS;
-extern const int LOGICAL_ERROR;
-extern const int OPENSSL_ERROR;
+    extern const int BAD_ARGUMENTS;
+    extern const int LOGICAL_ERROR;
+    extern const int OPENSSL_ERROR;
 }
 
 namespace ACMEClient
@@ -65,15 +65,19 @@ namespace
 
 namespace fs = std::filesystem;
 
-std::string generateCSR(std::vector<std::string> domain_names)
+std::string generateCSR(std::string pkey, std::vector<std::string> domain_names)
 {
     if (domain_names.empty())
         throw Exception(ErrorCodes::BAD_ARGUMENTS, "No domain names provided");
 
     auto name = domain_names.front();
 
-    auto bits = 4096;
-    EVP_PKEY * key(EVP_RSA_gen(bits));
+    EVP_PKEY * key = EVP_PKEY_new();
+    BIO * pkey_bio(BIO_new_mem_buf(pkey.c_str(), -1));
+    if (PEM_read_bio_PrivateKey(pkey_bio, &key, nullptr, nullptr) == nullptr)
+    {
+        throw Exception(ErrorCodes::OPENSSL_ERROR, "Error reading private key: {}", getOpenSSLErrors());
+    }
 
     X509_REQ * req(X509_REQ_new());
     X509_NAME * cn = X509_REQ_get_subject_name(req);
@@ -82,7 +86,7 @@ std::string generateCSR(std::vector<std::string> domain_names)
         throw Exception(ErrorCodes::OPENSSL_ERROR, "Error adding CN to X509_NAME");
     }
 
-    if (domain_names.begin() != domain_names.end())
+    if (domain_names.size() > 1)
     {
         X509_EXTENSIONS * extensions(sk_X509_EXTENSION_new_null());
 
@@ -98,31 +102,16 @@ std::string generateCSR(std::vector<std::string> domain_names)
         // ossl_check_X509_EXTENSION_type(nid);
 
         int ret = OPENSSL_sk_push(reinterpret_cast<OPENSSL_STACK *>(extensions), static_cast<const void *>(nid));
-
-        // if (!sk_X509_EXTENSION_push(extensions, X509V3_EXT_conf_nid(
-        //     nullptr,
-        //     nullptr,
-        //     NID_subject_alt_name,
-        //     other_domain_names.c_str()
-        // )))
         if (!ret)
         {
-            throw Exception(ErrorCodes::OPENSSL_ERROR, "Unable to add Subject Alternative Name to extensions");
+            throw Exception(ErrorCodes::OPENSSL_ERROR, "Unable to add Subject Alternative Name to extensions {}", getOpenSSLErrors());
         }
 
         if (X509_REQ_add_extensions(req, extensions) != 1)
         {
-            throw Exception(ErrorCodes::OPENSSL_ERROR, "Unable to add Subject Alternative Names to CSR");
+            throw Exception(ErrorCodes::OPENSSL_ERROR, "Unable to add Subject Alternative Names to CSR {}", getOpenSSLErrors());
         }
     }
-
-    BIO * key_bio(BIO_new(BIO_s_mem()));
-    if (PEM_write_bio_PrivateKey(key_bio, key, nullptr, nullptr, 0, nullptr, nullptr) != 1)
-    {
-        throw Exception(ErrorCodes::OPENSSL_ERROR, "Error writing private key to BIO");
-    }
-    std::string private_key;
-
 
     if (!X509_REQ_set_pubkey(req, key))
     {
@@ -150,13 +139,7 @@ std::string generateCSR(std::vector<std::string> domain_names)
     }
     csr = base64Encode(csr, /*url_encoding*/ true, /*no_padding*/ true);
 
-    while ((bytes_read = BIO_read(key_bio, buffer, sizeof(buffer))) > 0)
-    {
-        private_key.append(buffer, bytes_read);
-    }
-
     LOG_DEBUG(&Poco::Logger::get("ACME"), "CSR: {}", csr);
-    LOG_DEBUG(&Poco::Logger::get("ACME"), "Private key: {}", private_key);
 
     return csr;
 }
@@ -169,18 +152,14 @@ std::string generatePrivateKeyInPEM()
     if (PEM_write_bio_RSAPrivateKey(key_bio, key.impl()->getRSA(), nullptr, nullptr, 0, nullptr, nullptr) != 1)
     {
         BIO_free(key_bio);
-        // EVP_PKEY_free(pkey);
         throw Exception(ErrorCodes::OPENSSL_ERROR, "Error writing private key to BIO: {}", getOpenSSLErrors());
     }
 
-    unsigned char * data = nullptr;
-    size_t data_len = 0;
+    char * data;
+    size_t data_len = BIO_get_mem_data(key_bio, &data);
 
-    data_len = BIO_get_mem_data(key_bio, &data);
-    std::string private_key(reinterpret_cast<char *>(data), data_len);
-
+    std::string private_key(data, data_len);
     BIO_free(key_bio);
-    // EVP_PKEY_free(pkey);
 
     return private_key;
 }
@@ -197,6 +176,7 @@ ACMEClient & ACMEClient::instance()
 
 void ACMEClient::requestCertificate(const Poco::Util::AbstractConfiguration &)
 {
+    LOG_DEBUG(log, "ACME requestCertificate called");
     /// TODO
 }
 
@@ -213,6 +193,9 @@ void ACMEClient::initialize(const Poco::Util::AbstractConfiguration & config)
     // if (http_port != 80 && !initialized)
     //     LOG_WARNING(log, "For ACME HTTP challenge HTTP port must be 80, but is {}", http_port);
 
+    if (!config.has("acme"))
+        return;
+
     directory_url = config.getString("acme.directory_url", LetsEncrypt::ACME_STAGING_DIRECTORY_URL);  /// FIXME
     contact_email = config.getString("acme.email", "");
     terms_of_service_agreed = config.getBool("acme.terms_of_service_agreed");
@@ -224,14 +207,19 @@ void ACMEClient::initialize(const Poco::Util::AbstractConfiguration & config)
     for (const auto & key : domains_keys)
     {
         served_domains.push_back(config.getString("acme.domains." + key));
+        LOG_DEBUG(log, "Serving domain: {}", served_domains.back());
     }
     domains = served_domains;
+    refresh_certificates_interval = config.getInt("acme.refresh_certificates_interval", 1000 * 60 * 60);
 
     connection_timeout_settings = ConnectionTimeouts();
     proxy_configuration = ProxyConfiguration();
 
     zookeeper = Context::getGlobalContextInstance()->getZooKeeper();
     zookeeper->createIfNotExists(fs::path(ZOOKEEPER_ACME_BASE_PATH), "");
+    zookeeper->createIfNotExists(fs::path(ZOOKEEPER_ACME_BASE_PATH) / "challenges", "");
+    zookeeper->createIfNotExists(fs::path(ZOOKEEPER_ACME_BASE_PATH) / "keys", "");
+    zookeeper->createIfNotExists(fs::path(ZOOKEEPER_ACME_BASE_PATH) / "certificates", "");
 
     BackgroundSchedulePool & bgpool = Context::getGlobalContextInstance()->getSchedulePool();
 
@@ -241,19 +229,38 @@ void ACMEClient::initialize(const Poco::Util::AbstractConfiguration & config)
         {
             try
             {
-                // auto context = Context::getGlobalContextInstance();
-                // auto zk = context->getZooKeeper();
+                auto context = Context::getGlobalContextInstance();
+                auto zk = context->getZooKeeper();
 
                 /// read orders from zk before submitting new ones
-                auto ordr = order();
+
+                for (const auto & order_url : order_urls)
+                {
+                    auto order_data = describeOrder(order_url);
+
+                    if (order_data.finalize_url.empty())
+                        continue;
+
+                    if (order_data.certificate_url.empty())
+                    {
+                        finalizeOrder(order_data.finalize_url);
+                        continue;
+                    }
+
+                    auto certificate = pullCertificate(order_data.certificate_url);
+                    zk->createIfNotExists(fs::path(ZOOKEEPER_ACME_BASE_PATH) / "certificates" / "certificate", certificate);
+                }
+
+                if (order_urls.empty())
+                    order_urls.insert(order());
             }
             catch (...)
             {
                 refresh_certificates_task->scheduleAfter(10000);
-                tryLogCurrentException("Failed to refresh certificates TODO");
+                tryLogCurrentException("ACMEClient");
             }
 
-            refresh_certificates_task->scheduleAfter(1000 * 60 * 60); /// fixme config
+            refresh_certificates_task->scheduleAfter(60000); /// fixme config
         }
     );
 
@@ -264,6 +271,13 @@ void ACMEClient::initialize(const Poco::Util::AbstractConfiguration & config)
             LOG_DEBUG(log, "Running ACMEClient authentication task");
             if (!key_id.empty())
                 return;
+
+            if (!private_acme_key)
+            {
+                LOG_WARNING(log, "Private key is not initialized, retrying in 1 second. This is a bug.");
+                refresh_key_task->scheduleAfter(1000);
+                return;
+            }
 
             try
             {
@@ -282,7 +296,7 @@ void ACMEClient::initialize(const Poco::Util::AbstractConfiguration & config)
             }
         });
 
-    /// First, we need to get private key from Keeper,
+    /// First we need to get private key from Keeper,
     /// or generate one if we have not already.
     /// This blocks authorization, as key is required for this step.
 
@@ -311,6 +325,8 @@ void ACMEClient::initialize(const Poco::Util::AbstractConfiguration & config)
                 LOG_DEBUG(log, "Generating new RSA private key for ACME account");
                 private_key = generatePrivateKeyInPEM();
 
+                /// This lock is most likely redundant, as `createIfNotExists` will not replace contents.
+                /// If we reschedule after an attempt to create a key, we should always see the latest state.
                 if (!lock)
                     lock = std::make_shared<zkutil::ZooKeeperLock>(zookeeper, ZOOKEEPER_ACME_BASE_PATH, "leader_lock", "Key generation lock");
 
@@ -335,9 +351,14 @@ void ACMEClient::initialize(const Poco::Util::AbstractConfiguration & config)
                     tryLogCurrentException("ACMEClient");
                 }
             }
+
             chassert(!private_key.empty());
+            chassert(!private_acme_key);
 
             {
+                if (private_acme_key)
+                    LOG_WARNING(log, "Private key already loaded, this is a bug");
+
                 std::lock_guard key_lock(private_acme_key_mutex);
                 std::istringstream private_key_stream(private_key); // STYLE_CHECK_ALLOW_STD_STRING_STREAM
                 private_acme_key = std::make_shared<Poco::Crypto::RSAKey>(nullptr, &private_key_stream, "");
@@ -400,6 +421,8 @@ ACMEClient::doJWSRequest(const std::string & url, const std::string & payload, s
         throw Exception(ErrorCodes::LOGICAL_ERROR, "Account private key is not initialized");
 
     const auto nonce = requestNonce();
+
+    LOG_DEBUG(log, "Making JWS request to URL: {}", url);
 
     auto uri = Poco::URI(url);
 
@@ -529,21 +552,74 @@ std::string ACMEClient::order()
     LOG_DEBUG(log, "Status: {}, Expires: {}, Finalize: {}", status, expires, finalize);
 
     auto order_url = http_response->get("Location");
-    return order_url;
 
-    // if (status == "ready")
-    // {
-    //     return order_url;
-    // }
-    //
-    // for (const auto & auth : *authorizations)
-    // {
-    //     LOG_DEBUG(log, "Authorization: {}", auth.toString());
-    //
-    //     processAuthorization(auth.toString());
-    // }
-    //
-    // return finalize;
+    for (const auto & auth : *authorizations)
+    {
+        LOG_DEBUG(log, "Authorization: {}", auth.toString());
+
+        processAuthorization(auth.toString());
+    }
+
+    return order_url;
+}
+
+
+ACMEOrder ACMEClient::describeOrder(const std::string & order_url)
+{
+    std::string read_buffer;
+    ReadSettings read_settings;
+    auto reader = std::make_unique<ReadBufferFromWebServer>(
+        order_url,
+        Context::getGlobalContextInstance(),
+        DBMS_DEFAULT_BUFFER_SIZE,
+        read_settings,
+        /* use_external_buffer */ true,
+        /* read_until_position */ 0);
+    readStringUntilEOF(read_buffer, *reader);
+
+    Poco::JSON::Parser parser;
+    auto json = parser.parse(read_buffer).extract<Poco::JSON::Object::Ptr>();
+
+    LOG_DEBUG(log, "DescribeOrder response: {}", read_buffer);
+
+    auto status = json->getValue<std::string>("status");
+    auto expires = json->getValue<std::string>("expires");
+
+    auto identifiers = json->getArray("identifiers");
+    auto authorizations = json->getArray("authorizations");
+
+    auto finalize = json->getValue<std::string>("finalize");
+
+    std::string certificate;
+    if (json->has("certificate"))
+        certificate = json->getValue<std::string>("certificate");
+
+    auto order_data = ACMEOrder{
+        .status = status,
+        .order_url = order_url,
+        .finalize_url = finalize,
+        .certificate_url = certificate,
+    };
+
+    return order_data;
+}
+
+std::string ACMEClient::pullCertificate(const std::string & certificate_url)
+{
+    std::string certificate;
+    ReadSettings read_settings;
+    auto reader = std::make_unique<ReadBufferFromWebServer>(
+        certificate_url,
+        Context::getGlobalContextInstance(),
+        DBMS_DEFAULT_BUFFER_SIZE,
+        read_settings,
+        /* use_external_buffer */ true,
+        /* read_until_position */ 0);
+    readStringUntilEOF(certificate, *reader);
+
+    LOG_DEBUG(log, "PullCertificate response: {}", certificate);
+
+    return certificate;
 }
 
 void ACMEClient::processAuthorization(const std::string & auth_url)
@@ -570,6 +646,12 @@ void ACMEClient::processAuthorization(const std::string & auth_url)
     {
         auto ch = challenge.extract<Poco::JSON::Object::Ptr>();
 
+        if (!ch->has("validated"))
+        {
+            LOG_DEBUG(log, "Challenge is already validated");
+            continue;
+        }
+
         auto type = ch->getValue<std::string>("type");
         auto url = ch->getValue<std::string>("url");
         auto status = ch->getValue<std::string>("status");
@@ -578,11 +660,15 @@ void ACMEClient::processAuthorization(const std::string & auth_url)
         LOG_DEBUG(log, "Challenge: type: {}, url: {}, status: {}, token: {}", type, url, status, token);
         if (type == HTTP_01_CHALLENGE_TYPE)
         {
-            auto zk = Context::getGlobalContextInstance()->getZooKeeper();
-            zk->createIfNotExists(fs::path(ZOOKEEPER_ACME_BASE_PATH) / token, token);
-
             if (status == "valid")
+            {
+                LOG_DEBUG(log, "Challenge is already validated");
                 continue;
+            }
+
+            /// TODO identifier.value as a hostname
+            auto zk = Context::getGlobalContextInstance()->getZooKeeper();
+            zk->createIfNotExists(fs::path(ZOOKEEPER_ACME_BASE_PATH) / "challenges" / token, token);
 
             auto response = doJWSRequest(url, "{}", nullptr);
 
@@ -593,7 +679,14 @@ void ACMEClient::processAuthorization(const std::string & auth_url)
 
 void ACMEClient::finalizeOrder(const std::string & finalize_url)
 {
-    std::string csr = generateCSR(domains);
+    auto key = generatePrivateKeyInPEM();
+
+    auto context = Context::getGlobalContextInstance();
+    auto zk = context->getZooKeeper();
+
+    zk->createIfNotExists(fs::path(ZOOKEEPER_ACME_BASE_PATH) / "keys" / "private_key", key);
+
+    std::string csr = generateCSR(key, domains);
     auto payload = R"({"csr":")" + csr + R"("})";
 
     auto http_response = std::make_shared<Poco::Net::HTTPResponse>();
@@ -630,28 +723,9 @@ std::string ACMEClient::requestChallenge(const std::string & uri)
 {
     LOG_DEBUG(log, "Requesting challenge for {}", uri);
 
-    // {
-    //  "protected": base64url({
-    //    "alg": "ES256",
-    //    "kid": "https://example.com/acme/acct/evOfKhNU60wg",
-    //    "nonce": "UQI1PoRi5OuXzxuX7V7wL0",
-    //    "url": "https://example.com/acme/chall/prV_B7yEyA4"
-    //  }),
-    //  "payload": base64url({}),
-    //  "signature": "Q1bURgJoEslbD1c5...3pYdSMLio57mQNN4"
-    // }
-
-    /// TODO remember which tokens we've requested
-
     LOG_DEBUG(log, "Challenge requested for uri: {}", uri);
 
     if (!uri.starts_with(ACME_CHALLENGE_HTTP_PATH))
-        return "";
-
-    auto host = Poco::URI(uri).getHost();
-    LOG_DEBUG(log, "Host: {}", host);
-
-    if (std::find(domains.begin(), domains.end(), host) == domains.end())
         return "";
 
     auto context = Context::getGlobalContextInstance();
@@ -660,18 +734,31 @@ std::string ACMEClient::requestChallenge(const std::string & uri)
     Coordination::Stat challenge_stat;
     std::string challenge;
 
-    auto response = zk->tryGet(fs::path(ZOOKEEPER_ACME_BASE_PATH) / host / "challenge", challenge, &challenge_stat);
+    /// TODO limit size?
+    std::string token_from_uri = uri.substr(std::string(ACME_CHALLENGE_HTTP_PATH).size());
+
+    auto response = zk->tryGet(fs::path(ZOOKEEPER_ACME_BASE_PATH) / "challenges" / token_from_uri, challenge, &challenge_stat);
     if (!response)
         return "";
 
-    // std::string token_from_uri = uri.substr(std::string(ACME_CHALLENGE_HTTP_PATH).size());
-    // auto jwk = JSONWebKey::fromRSAKey(*private_acme_key).toString();
-    // auto jwk_thumbprint = encodeSHA256(jwk);
-    // jwk_thumbprint = base64Encode(jwk_thumbprint, /*url_encoding*/ true, /*no_padding*/ true);
-    //
-    // return token_from_uri + "." + jwk_thumbprint;
+    if (challenge.empty())
+    {
+        LOG_DEBUG(log, "No challenge found for uri: {}", uri);
+        return "";
+    }
 
-    return challenge;
+    if (challenge != token_from_uri)
+    {
+        LOG_DEBUG(log, "Challenge mismatch for uri: {}, expected: {}, got: {}", uri, token_from_uri, challenge);
+        return "";
+    }
+
+    auto jwk = JSONWebKey::fromRSAKey(*private_acme_key).toString();
+    auto jwk_thumbprint = encodeSHA256(jwk);
+    jwk_thumbprint = base64Encode(jwk_thumbprint, /*url_encoding*/ true, /*no_padding*/ true);
+
+    refresh_certificates_task->scheduleAfter(1000);
+    return token_from_uri + "." + jwk_thumbprint;
 }
 
 }

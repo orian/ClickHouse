@@ -16,7 +16,7 @@ std::string encodeSHA256(const void * text, size_t size);
 void encodeSHA256(std::string_view text, unsigned char * out);
 void encodeSHA256(const void * text, size_t size, unsigned char * out);
 
-std::string calculateHMACwithSHA256(std::string, Poco::Crypto::RSAKey &);
+std::string calculateHMACwithSHA256(std::string, const Poco::Crypto::RSAKey &);
 
 /// Returns concatenation of error strings for all errors that OpenSSL has recorded, emptying the error queue.
 String getOpenSSLErrors();

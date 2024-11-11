@@ -151,7 +151,7 @@ void CertificateReloader::tryLoadImpl(const Poco::Util::AbstractConfiguration & 
 
     if (new_cert_path.empty() || new_key_path.empty())
     {
-        LOG_INFO(log, "One of paths is empty. Cannot apply new configuration for certificates. Fill all paths and try again.");
+        LOG_WARNING(log, "One of paths is empty. Cannot apply new configuration for certificates. Fill all paths and try again.");
         return;
     }
 

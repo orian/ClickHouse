@@ -1,5 +1,6 @@
 #pragma once
 
+#include <unordered_set>
 #include "config.h"
 
 #include <Common/ZooKeeper/ZooKeeperLock.h>
@@ -66,6 +67,14 @@ struct Directory
     }
 };
 
+struct ACMEOrder {
+    std::string status;
+
+    std::string order_url;
+    std::string finalize_url;
+    std::string certificate_url;
+};
+
 
 static constexpr auto ACME_CHALLENGE_HTTP_PATH = "/.well-known/acme-challenge/";
 
@@ -91,6 +100,8 @@ public:
     void initialize(const Poco::Util::AbstractConfiguration & config);
     void reload(const Poco::Util::AbstractConfiguration & config);
     std::string requestChallenge(const std::string & uri);
+
+    bool isReady() const { return false; }
 
     void requestCertificate(const Poco::Util::AbstractConfiguration & config);
 private:
@@ -125,6 +136,8 @@ private:
     std::shared_ptr<zkutil::ZooKeeperLock> lock;
 
     std::vector<std::string> domains;
+    UInt64 refresh_certificates_interval;
+    std::unordered_set<std::string> order_urls;
 
     std::string requestNonce();
     DirectoryPtr getDirectory();
@@ -134,6 +147,8 @@ private:
     void processAuthorization(const std::string & auth_url);
     void tryGet(const std::string & finalize_url, Poco::Crypto::RSAKey & key);
     std::string doJWSRequest(const std::string &, const std::string &, std::shared_ptr<Poco::Net::HTTPResponse>);
+    ACMEOrder describeOrder(const std::string & order_url);
+    std::string pullCertificate(const std::string & certificate_url);
 };
 
 }
