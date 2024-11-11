@@ -68,7 +68,8 @@ struct Directory
     }
 };
 
-struct ACMEOrder {
+struct ACMEOrder
+{
     std::string status;
 
     std::string order_url;
