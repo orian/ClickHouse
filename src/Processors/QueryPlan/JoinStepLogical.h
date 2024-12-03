@@ -5,6 +5,7 @@
 #include <Interpreters/JoinInfo.h>
 #include <Processors/QueryPlan/JoinStep.h>
 #include <Processors/QueryPlan/SortingStep.h>
+#include <Common/SipHash.h>
 
 namespace DB
 {
@@ -57,6 +58,7 @@ public:
     void describeActions(JSONBuilder::JSONMap & map) const override;
     void describeActions(FormatSettings & settings) const override;
 
+    bool hasPreparedJoinStorage() const;
     void setPreparedJoinStorage(PreparedJoinStorage storage);
     void setHashTableCacheKey(IQueryTreeNode::HashState hash_table_key_hash_);
     const SortingStep::Settings & getSortingSettings() const { return sorting_settings; }
