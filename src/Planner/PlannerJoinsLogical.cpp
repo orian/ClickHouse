@@ -279,10 +279,10 @@ void buildJoinCondition(const QueryTreeNodePtr & node, JoinInfoBuildContext & bu
         return;
 
     auto expr_source = builder_context.getExpressionSource(node);
-    if (expr_source == JoinInfoBuildContext::JoinSource::Left)
-        join_condition.left_filter_conditions.push_back(builder_context.addExpression(node, expr_source));
+    if (expr_source == JoinInfoBuildContext::JoinSource::Left || expr_source == JoinInfoBuildContext::JoinSource::None)
+        join_condition.left_filter_conditions.push_back(builder_context.addExpression(node, JoinInfoBuildContext::JoinSource::Left));
     else if (expr_source == JoinInfoBuildContext::JoinSource::Right)
-        join_condition.right_filter_conditions.push_back(builder_context.addExpression(node, expr_source));
+        join_condition.right_filter_conditions.push_back(builder_context.addExpression(node, JoinInfoBuildContext::JoinSource::Right));
     else
         join_condition.residual_conditions.push_back(builder_context.addExpression(node, expr_source));
 }
@@ -317,21 +317,20 @@ std::unique_ptr<JoinStepLogical> buildJoinStepLogical(
     const auto & right_columns = right_header.getColumnsWithTypeAndName();
     JoinInfoBuildContext build_context(join_node, left_columns, right_columns, planner_context);
 
-    auto join_expression_constant = tryExtractConstantFromConditionNode(join_node.getJoinExpression());
-    if (join_node.getJoinExpression()->getNodeType() == QueryTreeNodeType::CONSTANT && !join_expression_constant.has_value())
+    auto join_on_expression = join_node.getJoinExpression();
+    auto join_expression_constant = tryExtractConstantFromConditionNode(join_on_expression);
+    if (join_on_expression && join_on_expression->getNodeType() == QueryTreeNodeType::CONSTANT && !join_expression_constant.has_value())
     {
         throw Exception(ErrorCodes::INVALID_JOIN_ON_EXPRESSION, "Wrong type {} of JOIN expression {}",
-            join_node.getJoinExpression()->getResultType()->getName(), join_node.getJoinExpression()->formatASTForErrorMessage());
+            join_on_expression->getResultType()->getName(), join_on_expression->formatASTForErrorMessage());
     }
-
-    build_context.result_join_info.expression.constant_value = join_expression_constant;
 
     auto join_expression_node = getJoinExpressionFromNode(join_node);
 
-    /// CROSS JOIN: doesn't have expression
+    /// CROSS/PASTE JOIN: doesn't have expression
     if (join_expression_node == nullptr)
     {
-        if (!isCrossOrComma(join_node.getKind()))
+        if (!isCrossOrComma(join_node.getKind()) && !isPaste(join_node.getKind()))
             throw Exception(ErrorCodes::INVALID_JOIN_ON_EXPRESSION, "Missing join expression in {}", join_node.formatASTForErrorMessage());
     }
     /// USING
@@ -340,8 +339,8 @@ std::unique_ptr<JoinStepLogical> buildJoinStepLogical(
         buildJoinUsingCondition(join_expression_node, build_context, build_context.result_join_info.expression.condition);
         build_context.result_join_info.expression.is_using = true;
     }
-    /// JOIN ON some non-constant expression
-    else if (!join_expression_constant.has_value())
+    /// JOIN ON non-constant expression
+    else if (!join_expression_constant.has_value() || build_context.result_join_info.strictness == JoinStrictness::Asof)
     {
         if (join_expression_node->getNodeType() != QueryTreeNodeType::FUNCTION)
             throw Exception(ErrorCodes::INVALID_JOIN_ON_EXPRESSION,

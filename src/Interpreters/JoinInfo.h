@@ -77,9 +77,10 @@ struct JoinActionRef
         : node(node_) , column_name(node_ ? node_->result_name : "")
     {}
 
+    ColumnWithTypeAndName getColumn() const { return {node->column, node->result_type, column_name}; }
+
     operator bool() const { return node != nullptr; } /// NOLINT
 };
-
 
 /// JoinPredicate represents a single join qualifier
 /// that that apply to the combination of two tables.
@@ -116,9 +117,6 @@ struct JoinExpression
 
     /// Indicates if the join expression is defined with the USING clause
     bool is_using = false;
-
-    /// Set if JOIN ON expression was folded to a single constant on analysis stage
-    std::optional<bool> constant_value = {};
 };
 
 struct JoinInfo
@@ -135,6 +133,14 @@ struct JoinInfo
     /// The locality of the join (e.g., LOCAL, GLOBAL)
     JoinLocality locality;
 };
+
+
+std::string_view toString(PredicateOperator op);
+String toString(const JoinActionRef & predicate);
+String toString(const JoinPredicate & predicate);
+String toString(const JoinCondition & condition);
+String toString(const JoinExpression & expression);
+String toString(const JoinInfo & join_info);
 
 #define APPLY_FOR_JOIN_SETTINGS(M) \
     M(JoinAlgorithm, join_algorithm) \
