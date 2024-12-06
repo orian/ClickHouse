@@ -244,8 +244,8 @@ public:
     {
 /// NOLINTBEGIN(bugprone-macro-parentheses)
         using MappedType = Mapped;
-        std::unique_ptr<FixedHashMap<UInt8, Mapped>>                  key8;
-        std::unique_ptr<FixedHashMap<UInt16, Mapped>>                 key16;
+        std::unique_ptr<TwoLevelHashMap<UInt8, Mapped>> key8;
+        std::unique_ptr<TwoLevelHashMap<UInt16, Mapped>> key16;
         std::unique_ptr<TwoLevelHashMap<UInt32, Mapped, HashCRC32<UInt32>>> key32;
         std::unique_ptr<TwoLevelHashMap<UInt64, Mapped, HashCRC32<UInt64>>> key64;
         std::unique_ptr<TwoLevelHashMapWithSavedHash<StringRef, Mapped>> key_string;
@@ -408,6 +408,8 @@ public:
     void materializeColumnsFromLeftBlock(Block & block) const;
     Block materializeColumnsFromRightBlock(Block block) const;
 
+    std::vector<Sizes> key_sizes;
+
 private:
     friend class NotJoinedHash;
 
@@ -438,8 +440,6 @@ private:
     mutable std::unique_ptr<JoinStuff::JoinUsedFlags> used_flags;
     RightTableDataPtr data;
     bool have_compressed = false;
-
-    std::vector<Sizes> key_sizes;
 
     /// Needed to do external cross join
     TemporaryDataOnDiskScopePtr tmp_data;
