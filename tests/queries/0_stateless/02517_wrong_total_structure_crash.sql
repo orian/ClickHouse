@@ -1,4 +1,7 @@
 -- Tags: no-ordinary-database
+
+SET use_parallel_replicas = 0;
+
 CREATE OR REPLACE TABLE alias10__fuzz_13 (`Id` Array(Array(UInt256)), `EventDate` Array(String), `field1` Array(Array(Nullable(Int8))), `field2` Array(Date), `field3` Array(Array(Array(UInt128)))) ENGINE = Distributed(test_shard_localhost, currentDatabase(), alias_local10);
 
 set allow_deprecated_syntax_for_merge_tree=1;
