@@ -1,6 +1,6 @@
 -- Tags: distributed
 
-SET use_parallel_replicas = 0;
+SET allow_experimental_parallel_reading_from_replicas = 0;
 
 SELECT 'limit', * FROM remote('127.1', view(SELECT * FROM numbers(10))) SETTINGS limit=5;
 SELECT 'offset', * FROM remote('127.1', view(SELECT * FROM numbers(10))) SETTINGS offset=5;
